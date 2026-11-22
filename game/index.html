@@ -90,12 +90,15 @@
 
         // Shot handling
         let shotFrozen = false;
-        let shotDebugInfo = '';
 
         // Synchronous staging and render if shot requested
         if (shot) {
-          const stagedWorld = stageScene(shot, seed);
-          shotDebugInfo = `SHOT:${shot} SEED:${seed} | Thief:(${stagedWorld.thief.x.toFixed(0)},${stagedWorld.thief.y.toFixed(0)}) State:${stagedWorld.gameState} Alarm:${stagedWorld.alarm.level.toFixed(1)} PC:${stagedWorld.powerCut.active}`;
+          let stagedWorld;
+          try {
+            stagedWorld = stageScene(shot, seed);
+          } catch (e) {
+            stagedWorld = createWorld(seed);
+          }
           applyStagedWorld(world, stagedWorld);
           renderer.render(world);
           renderer.render(world);
@@ -152,16 +155,9 @@
 
           renderer.render(world);
 
-          if (shotDebugInfo) {
-            const ctx = canvas.getContext('2d');
-            ctx.fillStyle = 'rgba(13,18,32,0.9)';
-            ctx.fillRect(10, 10, 600, 40);
-            ctx.strokeStyle = '#f2c94c';
-            ctx.lineWidth = 2;
-            ctx.strokeRect(10, 10, 600, 40);
-            ctx.fillStyle = '#f2c94c';
-            ctx.font = 'bold 16px monospace';
-            ctx.fillText(shotDebugInfo, 20, 38);
+          // For shot mode, render once and stop the loop
+          if (shotFrozen) {
+            return; // Stop the loop
           }
 
           requestAnimationFrame(gameLoop);
@@ -173,7 +169,6 @@
         window.__gameWorld = world;
         window.__gameInput = input;
       } catch (e) {
-        console.error('Game init failed:', e);
         document.body.style.borderTop = '4px solid #ff1744';
         document.body.textContent = 'Error: ' + e.message;
       }

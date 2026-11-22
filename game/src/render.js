@@ -545,7 +545,7 @@ export function createRenderer(canvas) {
     }
   }
 
-  function drawPowerCutBanner() {
+  function drawPowerCutBanner(world) {
     const text = 'POWER CUT';
     ctx.font = 'bold 48px "Segoe UI", sans-serif';
     const tw = ctx.measureText(text).width;
@@ -581,7 +581,7 @@ export function createRenderer(canvas) {
     // Timer
     ctx.font = 'bold 24px monospace';
     ctx.fillStyle = '#ffebee';
-    ctx.fillText(`${Math.ceil(powerCutTimer)}s`, CONFIG.FIELD_W / 2, y + bh + 30);
+    ctx.fillText(`${Math.ceil(world.powerCut.timer)}s`, CONFIG.FIELD_W / 2, y + bh + 30);
   }
 
   function drawHUD(world) {
@@ -602,54 +602,54 @@ export function createRenderer(canvas) {
     ctx.fillStyle = COLORS.TEXT;
     ctx.font = FONT_LARGE;
     ctx.textAlign = 'left';
-    ctx.fillText('THE SILENT LEDGER', 20, 35);
+    ctx.fillText('THE SILENT LEDGER', 20, 38);
 
     // Objective (center)
     ctx.font = FONT_MEDIUM;
-    let objective = 'Infiltrate Meridian Bank — Steal the Ledger';
-    if (thief.hasLedger) objective = 'Ledger secured — Reach the EXIT';
-    else if (thief.loot.length > 0) objective = `Carrying ${thief.loot.length} item(s) — Find the Ledger`;
+    let objective = 'Infiltrate Meridian Bank \u2014 Steal the Ledger';
+    if (thief.hasLedger) objective = 'Ledger secured \u2014 Reach the EXIT';
+    else if (thief.loot.length > 0) objective = `Carrying ${thief.loot.length} item(s) \u2014 Find the Ledger`;
     const objW = ctx.measureText(objective).width;
-    ctx.fillStyle = COLORS.TEXT_DIM;
-    ctx.fillText(objective, (CONFIG.FIELD_W - objW) / 2, 35);
+    ctx.fillStyle = COLORS.TEXT;
+    ctx.fillText(objective, (CONFIG.FIELD_W - objW) / 2, 38);
 
     // Loot / Score (center-right)
     ctx.font = FONT_SMALL;
     ctx.textAlign = 'right';
     const lootText = `Loot: ${thief.loot.length}  |  Score: ${score.lootPoints}`;
     ctx.fillStyle = COLORS.TEXT;
-    ctx.fillText(lootText, CONFIG.FIELD_W - 20, 30);
+    ctx.fillText(lootText, CONFIG.FIELD_W - 20, 32);
 
     // Timer
     const minutes = Math.floor(playTime / 60);
     const seconds = Math.floor(playTime % 60);
     const timeText = `${minutes.toString().padStart(2, '0')}:${seconds.toString().padStart(2, '0')}`;
     ctx.fillStyle = COLORS.TEXT_DIM;
-    ctx.fillText(timeText, CONFIG.FIELD_W - 20, 52);
+    ctx.fillText(timeText, CONFIG.FIELD_W - 20, 56);
 
     // Coins
     ctx.fillStyle = COLORS.COIN;
-    ctx.font = '16px sans-serif';
+    ctx.font = '18px sans-serif';
     ctx.textAlign = 'left';
-    ctx.fillText('Coins: '.repeat(0) + '●'.repeat(thief.coins) + '○'.repeat(CONFIG.COIN_COUNT - thief.coins), 20, 60);
+    ctx.fillText('\u25CF'.repeat(thief.coins) + '\u25CB'.repeat(CONFIG.COIN_COUNT - thief.coins), 20, 66);
 
     // Weight indicator
     if (thief.loot.length > 0) {
       const slowPct = Math.round(thief.loot.length * 8);
       ctx.fillStyle = COLORS.TEXT_DIM;
-      ctx.font = FONT_TINY;
-      ctx.fillText(`Weight: -${slowPct}% speed`, 20, 78);
+      ctx.font = '12px sans-serif';
+      ctx.fillText(`Weight: -${slowPct}% speed`, 20, 84);
     }
 
     // Alarm meter (wide bar, bottom of HUD)
     const meterX = 220;
-    const meterY = HUD_HEIGHT - 28;
+    const meterY = HUD_HEIGHT - 30;
     const meterW = CONFIG.FIELD_W - 440;
-    const meterH = 18;
+    const meterH = 20;
 
     // Background
     ctx.fillStyle = '#0a0e1a';
-    roundRect(ctx, meterX, meterY, meterW, meterH, 9);
+    roundRect(ctx, meterX, meterY, meterW, meterH, 10);
     ctx.fill();
 
     // Fill
@@ -663,19 +663,19 @@ export function createRenderer(canvas) {
     fillGrad.addColorStop(0, alarmColor);
     fillGrad.addColorStop(1, shadeColor(alarmColor, -30));
     ctx.fillStyle = fillGrad;
-    roundRect(ctx, meterX, meterY, fillW, meterH, 9);
+    roundRect(ctx, meterX, meterY, fillW, meterH, 10);
     ctx.fill();
 
     // Border
     ctx.strokeStyle = COLORS.HUD_BORDER;
-    ctx.lineWidth = 1.5;
-    roundRect(ctx, meterX, meterY, meterW, meterH, 9);
+    ctx.lineWidth = 2;
+    roundRect(ctx, meterX, meterY, meterW, meterH, 10);
     ctx.stroke();
 
     // Tick marks at thresholds
     for (const threshold of [CONFIG.ALARM_SUSPICIOUS, CONFIG.ALARM_ALARM, CONFIG.ALARM_MAX]) {
       const tx = meterX + (threshold / CONFIG.ALARM_MAX) * meterW;
-      ctx.strokeStyle = 'rgba(255,255,255,0.3)';
+      ctx.strokeStyle = 'rgba(255,255,255,0.4)';
       ctx.lineWidth = 1;
       ctx.beginPath();
       ctx.moveTo(tx, meterY);
@@ -685,22 +685,22 @@ export function createRenderer(canvas) {
 
     // Alarm state label
     ctx.fillStyle = alarmColor;
-    ctx.font = 'bold 14px sans-serif';
+    ctx.font = 'bold 15px sans-serif';
     ctx.textAlign = 'left';
-    ctx.fillText(alarm.state, meterX + meterW + 10, meterY + 13);
+    ctx.fillText(alarm.state, meterX + meterW + 12, meterY + 15);
 
     // Power cut indicator
     if (!powerCut.available) {
       ctx.fillStyle = powerCut.active ? COLORS.POWER_CUT_BANNER : COLORS.TEXT_DIM;
-      ctx.font = FONT_TINY;
+      ctx.font = '12px sans-serif';
       ctx.textAlign = 'right';
       const pcText = powerCut.active ? `POWER CUT: ${Math.ceil(powerCut.timer)}s` : 'POWER CUT: USED';
-      ctx.fillText(pcText, CONFIG.FIELD_W - 20, 78);
+      ctx.fillText(pcText, CONFIG.FIELD_W - 20, 84);
     } else {
       ctx.fillStyle = COLORS.TEXT_DIM;
-      ctx.font = FONT_TINY;
+      ctx.font = '12px sans-serif';
       ctx.textAlign = 'right';
-      ctx.fillText('Q: Power Cut (1x)', CONFIG.FIELD_W - 20, 78);
+      ctx.fillText('Q: Power Cut (1x)', CONFIG.FIELD_W - 20, 84);
     }
   }
 
@@ -712,14 +712,14 @@ export function createRenderer(canvas) {
     roundRect(ctx, x, y, LEGEND_W, LEGEND_H, 8);
     ctx.fill();
     ctx.strokeStyle = COLORS.HUD_BORDER;
-    ctx.lineWidth = 1.5;
+    ctx.lineWidth = 2;
     roundRect(ctx, x, y, LEGEND_W, LEGEND_H, 8);
     ctx.stroke();
 
-    ctx.font = 'bold 13px sans-serif';
+    ctx.font = 'bold 14px sans-serif';
     ctx.fillStyle = COLORS.TEXT;
     ctx.textAlign = 'left';
-    ctx.fillText('LEGEND', x + 12, y + 22);
+    ctx.fillText('LEGEND', x + 12, y + 24);
 
     const items = [
       { color: COLORS.THIEF, label: 'Wren (Thief)' },
@@ -731,30 +731,30 @@ export function createRenderer(canvas) {
       { color: COLORS.EXIT_GREEN, label: 'Exit (Green)' },
     ];
 
-    let iy = y + 42;
+    let iy = y + 46;
     for (const item of items) {
       ctx.fillStyle = item.color;
       ctx.beginPath();
-      ctx.arc(x + 20, iy + 4, 7, 0, Math.PI * 2);
+      ctx.arc(x + 20, iy + 5, 8, 0, Math.PI * 2);
       ctx.fill();
-      ctx.fillStyle = COLORS.TEXT_DIM;
-      ctx.font = FONT_TINY;
-      ctx.fillText(item.label, x + 36, iy + 11);
-      iy += 20;
+      ctx.fillStyle = COLORS.TEXT;
+      ctx.font = '13px sans-serif';
+      ctx.fillText(item.label, x + 36, iy + 13);
+      iy += 22;
     }
 
     // Controls hint
-    iy += 4;
+    iy += 6;
     ctx.fillStyle = COLORS.TEXT_DIM;
-    ctx.font = '11px sans-serif';
+    ctx.font = '12px sans-serif';
     ctx.fillText('WASD/Arrows: Move  |  Shift: Sneak  |  Click: Throw Coin', x + 12, iy);
-    iy += 16;
+    iy += 18;
     ctx.fillText('E: Interact  |  Q: Cut Power (1x)  |  P/Esc: Pause', x + 12, iy);
   }
 
   function drawScreenTitle(world) {
-    // Semi-transparent overlay
-    ctx.fillStyle = 'rgba(13, 18, 32, 0.95)';
+    // Semi-transparent overlay - lighter so room is visible
+    ctx.fillStyle = 'rgba(18, 24, 42, 0.85)';
     ctx.fillRect(0, 0, CONFIG.FIELD_W, CONFIG.FIELD_H);
 
     // Title
@@ -823,7 +823,7 @@ export function createRenderer(canvas) {
   }
 
   function drawScreenWin(world) {
-    ctx.fillStyle = 'rgba(13, 18, 32, 0.97)';
+    ctx.fillStyle = 'rgba(18, 24, 42, 0.92)';
     ctx.fillRect(0, 0, CONFIG.FIELD_W, CONFIG.FIELD_H);
 
     // Victory
@@ -845,8 +845,8 @@ export function createRenderer(canvas) {
     const minutes = Math.floor(playTime / 60);
     const seconds = Math.floor(playTime % 60);
 
-    ctx.font = '20px monospace';
-    ctx.fillStyle = COLORS.TEXT_DIM;
+    ctx.font = '22px monospace';
+    ctx.fillStyle = COLORS.TEXT;
     let sy = 300;
     const lines = [
       `Loot Points:      ${score.lootPoints.toString().padStart(6)}`,
@@ -859,7 +859,7 @@ export function createRenderer(canvas) {
       const color = line.startsWith('FINAL') ? COLORS.LOOT_GLOW : COLORS.TEXT;
       ctx.fillStyle = color;
       ctx.fillText(line, CONFIG.FIELD_W / 2, sy);
-      sy += 32;
+      sy += 36;
     }
 
     // Prompt

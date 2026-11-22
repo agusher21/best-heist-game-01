@@ -38,13 +38,11 @@ let frameCount = 0;
 
 // Shot handling
 let shotFrozen = false;
-let shotDebugInfo = '';
 
 // Initialize function that runs after page load
 function init() {
   if (shot) {
     const stagedWorld = stageScene(shot, seed);
-    shotDebugInfo = `SHOT:${shot} SEED:${seed} | Thief:(${stagedWorld.thief.x.toFixed(0)},${stagedWorld.thief.y.toFixed(0)}) State:${stagedWorld.gameState} Alarm:${stagedWorld.alarm.level.toFixed(1)} PC:${stagedWorld.powerCut.active}`;
     applyStagedWorld(world, stagedWorld);
     // Paint twice to ensure clean frame
     renderer.render(world);
@@ -111,19 +109,6 @@ function gameLoop(timestamp) {
 
   // Render
   renderer.render(world);
-
-  // Draw shot debug info on canvas
-  if (shotDebugInfo) {
-    const ctx = canvas.getContext('2d');
-    ctx.fillStyle = 'rgba(13,18,32,0.9)';
-    ctx.fillRect(10, 10, 600, 40);
-    ctx.strokeStyle = '#f2c94c';
-    ctx.lineWidth = 2;
-    ctx.strokeRect(10, 10, 600, 40);
-    ctx.fillStyle = '#f2c94c';
-    ctx.font = 'bold 16px monospace';
-    ctx.fillText(shotDebugInfo, 20, 38);
-  }
 
   // Continue loop (but frozen for shots)
   requestAnimationFrame(gameLoop);

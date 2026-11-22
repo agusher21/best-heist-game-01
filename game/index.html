@@ -1,0 +1,185 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>The Silent Ledger — Meridian Bank Heist</title>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body {
+      background: #0d1220;
+      color: #e8eaf6;
+      font-family: "Segoe UI", "Noto Sans", sans-serif;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      min-height: 100vh;
+      overflow: hidden;
+    }
+    #game {
+      display: block;
+      border: 2px solid #37474f;
+      box-shadow: 0 0 40px rgba(242, 201, 76, 0.15), inset 0 0 60px rgba(0, 0, 0, 0.5);
+      border-radius: 4px;
+    }
+    .status {
+      margin-top: 8px;
+      font-size: 13px;
+      color: #90a4ae;
+      text-align: center;
+      max-width: 1280px;
+      padding: 0 10px;
+    }
+    .status kbd {
+      background: #1a1f2e;
+      border: 1px solid #37474f;
+      border-radius: 3px;
+      padding: 1px 6px;
+      font-family: monospace;
+      font-size: 12px;
+      color: #f2c94c;
+    }
+  </style>
+</head>
+<body>
+  <canvas id="game" width="1280" height="720"></canvas>
+  <div class="status">
+    <kbd>WASD</kbd>/<kbd>Arrows</kbd> Move &nbsp;|&nbsp; <kbd>Shift</kbd> Sneak &nbsp;|&nbsp; <kbd>Click</kbd> Throw Coin &nbsp;|&nbsp; <kbd>E</kbd> Interact &nbsp;|&nbsp; <kbd>Q</kbd> Power Cut (1×) &nbsp;|&nbsp; <kbd>P</kbd>/<kbd>Esc</kbd> Pause &nbsp;|&nbsp; <kbd>Space</kbd> Start/Restart
+  </div>
+  <script>
+    // Load the game module and initialize
+    document.body.style.borderTop = '4px solid #f2c94c';
+    
+    async function initGame() {
+      try {
+        const { CONFIG } = await import('./src/config.js');
+        const { createWorld, updateWorld, GAME_STATES } = await import('./src/heist-world.js');
+        const { createInput } = await import('./src/input.js');
+        const { createRenderer } = await import('./src/render.js');
+        const { createAudio } = await import('./src/audio.js');
+        const { stageScene, applyStagedWorld } = await import('./src/shots.js');
+
+        // Parse URL parameters
+        const params = new URLSearchParams(window.location.search);
+        const shot = params.get('shot');
+        const seed = parseInt(params.get('seed') || '1', 10);
+
+        // Canvas setup
+        const canvas = document.getElementById('game');
+        canvas.width = CONFIG.FIELD_W;
+        canvas.height = CONFIG.FIELD_H;
+
+        // Game systems
+        const world = createWorld(seed);
+        const input = createInput();
+        const renderer = createRenderer(canvas);
+        const audio = createAudio();
+
+        // Attach input
+        input.attach(canvas);
+
+        // Footstep timer
+        let footstepTimer = 0;
+        const FOOTSTEP_INTERVAL = 0.35;
+
+        // Fixed timestep
+        const FIXED_DT = 1 / 60;
+        let accumulator = 0;
+        let lastTime = performance.now() / 1000;
+        let frameCount = 0;
+
+        // Shot handling
+        let shotFrozen = false;
+        let shotDebugInfo = '';
+
+        // Synchronous staging and render if shot requested
+        if (shot) {
+          const stagedWorld = stageScene(shot, seed);
+          shotDebugInfo = `SHOT:${shot} SEED:${seed} | Thief:(${stagedWorld.thief.x.toFixed(0)},${stagedWorld.thief.y.toFixed(0)}) State:${stagedWorld.gameState} Alarm:${stagedWorld.alarm.level.toFixed(1)} PC:${stagedWorld.powerCut.active}`;
+          applyStagedWorld(world, stagedWorld);
+          renderer.render(world);
+          renderer.render(world);
+          window.__shotReady = true;
+          shotFrozen = true;
+        }
+
+        function gameLoop(timestamp) {
+          const now = timestamp / 1000;
+          const frameTime = Math.min(now - lastTime, 0.1);
+          lastTime = now;
+          accumulator += frameTime;
+
+          const userInput = shotFrozen
+            ? { left: false, right: false, up: false, down: false, sneak: false, interact: false, throwCoin: false, powerCut: false, pause: false, mouseX: 0, mouseY: 0, justPressed: new Set() }
+            : input.poll();
+
+          if (!shotFrozen && (world.gameState === GAME_STATES.TITLE || world.gameState === GAME_STATES.CAUGHT || world.gameState === GAME_STATES.WIN)) {
+            if (input.consumeStart() || userInput.justPressed.has('start')) {
+              world.reset();
+              world.startGame();
+              audio.startAmbient();
+            }
+          }
+
+          if (!shotFrozen) {
+            if (world.gameState === GAME_STATES.PLAY && input.consumePause()) {
+              world.pause();
+            } else if (world.gameState === GAME_STATES.PAUSED && input.consumePause()) {
+              world.resume();
+            }
+          }
+
+          if (!shotFrozen) {
+            while (accumulator >= FIXED_DT) {
+              if (world.gameState === GAME_STATES.PLAY) {
+                updateWorld(world, FIXED_DT, userInput);
+
+                const { thief } = world;
+                const moving = userInput.left || userInput.right || userInput.up || userInput.down;
+                if (moving && !thief.caught) {
+                  footstepTimer += FIXED_DT;
+                  if (footstepTimer >= FOOTSTEP_INTERVAL * (thief.sneaking ? 2 : 1)) {
+                    if (thief.sneaking) audio.playSneakStep();
+                    else audio.playFootstep();
+                    footstepTimer = 0;
+                  }
+                }
+              }
+              accumulator -= FIXED_DT;
+              frameCount++;
+            }
+          }
+
+          renderer.render(world);
+
+          if (shotDebugInfo) {
+            const ctx = canvas.getContext('2d');
+            ctx.fillStyle = 'rgba(13,18,32,0.9)';
+            ctx.fillRect(10, 10, 600, 40);
+            ctx.strokeStyle = '#f2c94c';
+            ctx.lineWidth = 2;
+            ctx.strokeRect(10, 10, 600, 40);
+            ctx.fillStyle = '#f2c94c';
+            ctx.font = 'bold 16px monospace';
+            ctx.fillText(shotDebugInfo, 20, 38);
+          }
+
+          requestAnimationFrame(gameLoop);
+        }
+
+        audio.init();
+        requestAnimationFrame(gameLoop);
+
+        window.__gameWorld = world;
+        window.__gameInput = input;
+      } catch (e) {
+        console.error('Game init failed:', e);
+        document.body.style.borderTop = '4px solid #ff1744';
+        document.body.textContent = 'Error: ' + e.message;
+      }
+    }
+
+    initGame();
+  </script>
+</body>
+</html>

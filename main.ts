@@ -3,10 +3,11 @@
 
 import { buildDossier } from './vendor/makefun-game.ts';
 import { copyFileSync, cpSync, existsSync, mkdirSync, readFileSync, statSync, writeFileSync } from 'node:fs';
-import { join, resolve } from 'node:path';
+import { dirname, join, resolve } from 'node:path';
+import { fileURLToPath } from 'node:url';
 
 const OUTPUT_DIR = process.env.MAKEFUN_OUTPUT_DIR || '/output';
-const REPO_ROOT = resolve('.');
+const REPO_ROOT = dirname(fileURLToPath(import.meta.url));
 const GAME_SRC = join(REPO_ROOT, 'game');
 const SCREENSHOTS_SRC = join(REPO_ROOT, 'screenshots');
 const GAME_DST = join(OUTPUT_DIR, 'game');
